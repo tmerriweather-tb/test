@@ -27,6 +27,29 @@ function normalizeView(value) {
   const normalized = '/shared/' + filename;
   return knownSharedViews[normalized.toLowerCase()] || normalized;
 }
+// Branded, print-ready report. The canonical view key is shared with the review API.
+const safeArtworkUrl = value => {
+  try { const u=new URL(String(value||'')); return ['https:','http:'].includes(u.protocol)?u.href:null; } catch (_) { return null; }
+};
+const reportHtml = (state,view) => {
+  const cards=state.cards||[];
+  const decisions=state.decisions||{};
+  const approved=cards.filter(c=>decisions[c.id]?.decision==='approved').length;
+  const rejected=cards.filter(c=>decisions[c.id]?.decision==='rejected').length;
+  const done=approved+rejected;
+  const venue=view.split('/').pop().replace(/\.html$/i,'').replace(/_/g,' ');
+  const fmt=v=>{if(!v)return 'Not recorded';const d=new Date(v);return Number.isNaN(d.getTime())?esc(v):esc(d.toLocaleString('en-US',{dateStyle:'medium',timeStyle:'short',timeZone:'America/Chicago'}))+' CT';};
+  const cardsHtml=cards.map((c,i)=>{
+    const d=decisions[c.id]||{};const status=d.decision==='approved'?'APPROVED':d.decision==='rejected'?'REJECTED':'PENDING';
+    const media=safeArtworkUrl(c.artwork);
+    const isVideo=media&&/\.(mp4|webm|mov)(?:[?#]|$)/i.test(media);
+    const preview=media&&!isVideo?`<img loading="lazy" src="${esc(media)}" alt="Artwork preview" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="placeholder" style="display:none">PREVIEW UNAVAILABLE</div>`:media?`<div class="placeholder">VIDEO ARTWORK<br><a href="${esc(media)}" target="_blank" rel="noopener noreferrer">Open video</a></div>`:'<div class="placeholder">NO PREVIEW AVAILABLE</div>';
+    return `<article class="artwork"><div class="preview">${preview}</div><div class="detail"><div class="top"><span class="ordinal">ARTWORK ${String(i+1).padStart(2,'0')}</span><span class="status ${status.toLowerCase()}">${status}</span></div><h3>${esc(c.company)}</h3><p class="label">Decision recorded</p><p class="value">${fmt(d.updatedAt)}</p>${d.comment?`<p class="label">Reviewer comments</p><p class="comment">${esc(d.comment)}</p>`:''}${media?`<a class="source" href="${esc(media)}" target="_blank" rel="noopener noreferrer">View original artwork</a>`:''}</div></article>`;
+  }).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Artwork Approval Report | ${esc(venue)}</title><style>
+  :root{--purple:#8064a9;--dark:#20202a;--muted:#686878;--line:#e7e4eb;--bg:#f6f5f8}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--dark);font-family:'Museo Sans',Arial,Helvetica,sans-serif}main{max-width:1050px;margin:36px auto;background:#fff;box-shadow:0 14px 50px #2221}.hero{background:var(--dark);color:white;padding:38px 46px;border-top:9px solid var(--purple)}.brand{color:#cbb9e7;font-size:13px;font-weight:900;letter-spacing:.17em}.hero h1{font-family:'Bebas Neue Pro','Arial Narrow',Impact,sans-serif;font-stretch:condensed;font-size:clamp(34px,5vw,58px);letter-spacing:.03em;line-height:1.02;margin:14px 0}.hero p{margin:0;color:#e0dce7;font-size:15px}.content{padding:34px 46px}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:22px 0 34px}.metric{padding:22px;background:#f5f2f9;border-top:4px solid var(--purple)}.metric strong{display:block;font-size:36px;line-height:1.1}.metric span{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}h2{font-size:22px;margin:0 0 20px}.artwork{display:grid;grid-template-columns:180px 1fr;gap:24px;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px;break-inside:avoid}.preview{background:#f1eff4;border-radius:7px;min-height:155px;display:flex;align-items:center;justify-content:center;overflow:hidden}.preview img{width:100%;height:185px;object-fit:contain}.placeholder{color:#777;font-size:12px;text-align:center;padding:16px;line-height:1.8}.top{display:flex;align-items:center;justify-content:space-between;gap:10px}.ordinal,.label{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}.status{font-size:11px;font-weight:900;padding:7px 10px;border-radius:100px}.approved{background:#e7f5ed;color:#166a3b}.rejected{background:#fceaea;color:#a32323}.pending{background:#f2edf8;color:#7651a0}.detail h3{font-size:21px;margin:14px 0}.label{margin:12px 0 3px}.value,.comment{margin:0;font-size:13px;line-height:1.5}.comment{padding:10px;background:#faf5f5;border-left:3px solid #b53b3b}.source{display:inline-block;margin-top:12px;font-size:12px;color:#6e4e9c;overflow-wrap:anywhere}.footer{padding:20px 46px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}.toolbar{max-width:1050px;margin:18px auto;text-align:right}.toolbar button{background:var(--purple);color:white;border:0;border-radius:7px;padding:12px 20px;font-weight:700;cursor:pointer}@media(max-width:650px){main{margin:0}.hero,.content,.footer{padding:25px}.artwork{grid-template-columns:1fr}.preview img{height:220px}.summary{gap:7px}.metric{padding:12px}.metric strong{font-size:27px}.toolbar{margin:12px}}@media print{@page{size:letter;margin:12mm}body{background:#fff}main{box-shadow:none;margin:0;max-width:none}.toolbar{display:none}.hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}.metric,.status{-webkit-print-color-adjust:exact;print-color-adjust:exact}.artwork{break-inside:avoid}}
+  </style></head><body><div class="toolbar"><button onclick="window.print()">Print / Save as PDF</button></div><main><header class="hero"><div class="brand">TERRABOOST MEDIA</div><h1>ARTWORK APPROVAL REPORT</h1><p>${esc(venue)} &nbsp;·&nbsp; ${done===cards.length&&cards.length?'Review complete':'Review in progress'} &nbsp;·&nbsp; Generated ${fmt(new Date().toISOString())}</p></header><div class="content"><h2>Review summary</h2><div class="summary"><div class="metric"><strong>${cards.length}</strong><span>Total artworks</span></div><div class="metric"><strong>${approved}</strong><span>Approved</span></div><div class="metric"><strong>${rejected}</strong><span>Rejected</span></div></div><h2>Individual artwork decisions</h2>${cardsHtml||'<p>No artwork decisions recorded yet.</p>'}</div><footer class="footer">Terraboost Media · Artwork review record · Decisions are maintained by the Approvals Dashboard</footer></main></body></html>`;
+};
 const viewKey = v => crypto.createHash('sha256').update(v).digest('hex');
 const responseState = state => ({decisions:state.decisions||{},emailed:!!state.emailed,notificationStatus:state.emailed?'submitted':(state.notificationStatus||'pending'),notificationError:state.notificationError||null});
 // In some Netlify deploy contexts the Blobs runtime metadata is not injected.
@@ -48,7 +71,7 @@ exports.handler = async event => {
   const store=reviewStore();
   const key=viewKey(view);
   let state=await store.get(key,{type:'json'})||{view,decisions:{},emailed:false};
-  if(method==='GET')return json(200,responseState(state));
+  if(method==='GET'){if(input.format==='html')return {statusCode:200,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"},body:reportHtml(state,view)};return json(200,responseState(state));}
   if(!Array.isArray(input.cards)||!input.cards.length||input.cards.length>500)return json(400,{error:'Invalid artwork list'});
   const cards=input.cards.map(c=>({id:clean(c.id,60),company:clean(c.company,180),artwork:clean(c.artwork,500)}));
   if(cards.some(c=>!c.id||!c.company)||new Set(cards.map(c=>c.id)).size!==cards.length)return json(400,{error:'Invalid artwork identifiers'});
@@ -79,8 +102,8 @@ exports.handler = async event => {
         subject:`Completed artwork review - ${venue}`,
         venue,review_status:'Complete',view,completed_at:now,
         approved:String(approved),rejected:String(rejected),total:String(state.cards.length),
-        view_url:base+view,
-        summary:`Completed review for ${venue}: ${approved} approved and ${rejected} rejected, ${state.cards.length} artworks total.`,
+        view_url:base+view,report_url:base+'/.netlify/functions/review?view='+encodeURIComponent(view)+'&format=html',
+        summary:`Completed review for ${venue}: ${approved} approved and ${rejected} rejected, ${state.cards.length} artworks total. View the branded visual report using the report_url field.`,
         report,artwork_decisions:details
       };
       // Netlify's documented AJAX form pattern posts to the site root.

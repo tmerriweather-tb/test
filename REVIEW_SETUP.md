@@ -55,3 +55,9 @@ If a new report still shows only one artwork, verify the review progress count: 
 This update keeps Netlify Forms and its original form name. The notification payload now includes a readable venue, a completion status, a concise summary, and human-readable artwork decisions rather than a JSON dump. The full report remains available in the `report` field. The view URL is provided once as its own field. Existing Blobs review state and all shared pages are unchanged.
 
 **Important:** Netlify/Akismet controls spam classification. These content changes may reduce false positives but cannot guarantee verified delivery or override the spam filter. Mark legitimate reports as verified in Netlify Forms, and contact Netlify support with example submission IDs if new reports continue to be flagged. Existing reviews marked `emailed: true` will not automatically resubmit after deployment; test using an uncompleted shared view.
+
+
+## Branded visual report
+Each shared view now includes a **View branded report / PDF** button beside its review progress. The report is generated live from Netlify Blobs by `/.netlify/functions/review?view=<shared-view-path>&format=html`, with thumbnails for HTTP(S) artwork images, decisions, comments and a Print / Save as PDF button. Netlify Forms submissions now contain `report_url`, a direct link to the visual report.
+
+Brand note: the report uses a Terraboost-inspired dark/purple treatment and Museo Sans / Bebas Neue Pro font stacks with local fallbacks. Exact brand guide font files and logo were not embedded because the website's downloadable source assets were not available in this environment. For pixel-perfect compliance, supply the logo and licensed fonts. The report URL is publicly accessible to anyone with the link, like existing shared review pages; do not include sensitive comments without access controls.

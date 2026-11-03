@@ -402,10 +402,11 @@ function reviewActionHtml(d){
  const label=decision==='approved'?'Approved':decision==='rejected'?'Rejected':'Pending review';
  return `<div class="review-actions" data-review-id="${id}"><button type="button" class="${decision==='approved'?'review-approved':''}" onclick="submitArtworkReview('${id}','approved')" ${REVIEW_BUSY?'disabled':''}>✓ Approved</button><button type="button" class="${decision==='rejected'?'review-rejected':''}" onclick="submitArtworkReview('${id}','rejected')" ${REVIEW_BUSY?'disabled':''}>✕ Rejected</button><span class="review-status">${label}${state.comment?' — '+escapeHtml(state.comment):''}</span></div>`;
 }
+function openBrandedReviewReport(){window.open(REVIEW_API+'?view='+encodeURIComponent(reviewViewId())+'&format=html','_blank','noopener');}
 function updateReviewSummary(){
  const el=document.getElementById('review-summary');if(!el||!IS_SHARED_VIEW)return;
  const cards=reviewCards(),done=cards.filter(c=>REVIEW_DECISIONS[c.id]?.decision).length;
- el.textContent=`Artwork review: ${done} of ${cards.length} completed${done===cards.length&&cards.length?' · All decisions submitted':''}`;
+ el.innerHTML=`Artwork review: ${done} of ${cards.length} completed${done===cards.length&&cards.length?' · All decisions submitted':''} &nbsp; <button type="button" onclick="openBrandedReviewReport()" style="border:1px solid #8064a9;border-radius:6px;padding:6px 10px;background:#fff;color:#674994;cursor:pointer;font-weight:700">View branded report / PDF</button>`;
 }
 async function loadArtworkReviews(){
  if(!IS_SHARED_VIEW)return;
