@@ -7,6 +7,15 @@ const esc = s => clean(s,1200).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>
 const validView = v => typeof v==='string' && v.startsWith('/shared/') && v.endsWith('.html') && v.length<240 && !v.includes('..') && !/[?#\\\x00-\x1f]/.test(v);
 const viewKey = v => crypto.createHash('sha256').update(v).digest('hex');
 const responseState = state => ({decisions:state.decisions||{},emailed:!!state.emailed});
+// In some Netlify deploy contexts the Blobs runtime metadata is not injected.
+// Prefer explicit server-side credentials when provided; otherwise use Netlify's automatic context.
+function reviewStore() {
+  const siteID = process.env.REVIEW_BLOBS_SITE_ID || process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.REVIEW_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+  if (siteID && token) return getStore({ name: 'artwork-review-decisions', siteID, token });
+  return getStore('artwork-review-decisions');
+}
+
 exports.handler = async event => {
  try {
   const method=event.httpMethod;
@@ -14,7 +23,7 @@ exports.handler = async event => {
   const input=method==='POST'?JSON.parse(event.body||'{}'):event.queryStringParameters||{};
   const view=input.view;
   if(!validView(view))return json(400,{error:'Invalid shared page path'});
-  const store=getStore('artwork-review-decisions');
+  const store=reviewStore();
   const key=viewKey(view);
   let state=await store.get(key,{type:'json'})||{view,decisions:{},emailed:false};
   if(method==='GET')return json(200,responseState(state));
@@ -60,5 +69,11 @@ exports.handler = async event => {
     }
   }
   return json(200,{...responseState(state),complete,emailError});
- }catch(err){console.error('Review function failed',err);return json(500,{error:'Review service failed. Please try again.'});}
+ }catch(err){
+  console.error('Review function failed',err);
+  if(err?.name==='MissingBlobsEnvironmentError' || /not been configured to use Netlify Blobs/.test(String(err?.message||''))) {
+    return json(503,{error:'Review storage is not configured. Set REVIEW_BLOBS_SITE_ID and REVIEW_BLOBS_TOKEN in Netlify environment variables, then redeploy.',code:'BLOBS_NOT_CONFIGURED'});
+  }
+  return json(500,{error:'Review service failed. Please try again.'});
+ }
 };
