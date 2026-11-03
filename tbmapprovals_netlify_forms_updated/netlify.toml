@@ -1,0 +1,7 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+  command = "npm install && node scripts/build-pages.cjs"
+
+[functions]
+  node_bundler = "esbuild"
