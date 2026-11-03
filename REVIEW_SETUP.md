@@ -39,3 +39,12 @@ All 49 shared pages and their grouped navigation, landscape PDF, HTML download, 
 The review function now normalizes percent-encoded filenames and full URLs to a consistent `/shared/filename.html` identifier. This resolves HTTP 400 `Invalid shared page path` for valid shared pages. If a 400 persists, inspect the response `received` field (it contains the supplied path, not credentials) and compare it with the actual deployed URL.
 
 After deployment, verify GET at `/.netlify/functions/review?view=%2Fshared%2FHEB_Oct2026.html`, then test an Approved decision from the shared page. This does not guarantee email notification delivery until the form is configured and tested.
+
+
+## Consolidated report verification (updated)
+
+The function now posts the completed report to `/` using Netlify's AJAX Forms pattern. The registered form declares `summary`, `report`, and `artwork_decisions` fields. Open **Netlify > Forms > artwork-review-complete**, click the individual submission row (not just its timestamp) to view field values. The `report` field is the human-readable card-by-card report; `artwork_decisions` contains JSON for each card. A notification rule must separately be configured for `tmerriweather@terraboost.biz`.
+
+After deployment, use a **new, uncompleted shared view** for the end-to-end test. A view previously marked `emailed: true` will not send another report, even if you replace the code. If `emailed: false` and all decisions are complete, changing and resaving one card will retry the form submission. `emailed: true` means the form POST was accepted, not that an email reached the inbox. Check the Netlify Forms submission detail, spam submissions, and notification settings.
+
+If a new report still shows only one artwork, verify the review progress count: the function freezes the initial artwork list (`state.cards`) on the first saved decision. Changes to the list after that point require an intentional new review round; do not silently overwrite existing approval records.

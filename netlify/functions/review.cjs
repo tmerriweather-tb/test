@@ -28,7 +28,7 @@ function normalizeView(value) {
   return knownSharedViews[normalized.toLowerCase()] || normalized;
 }
 const viewKey = v => crypto.createHash('sha256').update(v).digest('hex');
-const responseState = state => ({decisions:state.decisions||{},emailed:!!state.emailed});
+const responseState = state => ({decisions:state.decisions||{},emailed:!!state.emailed,notificationStatus:state.emailed?'submitted':(state.notificationStatus||'pending'),notificationError:state.notificationError||null});
 // In some Netlify deploy contexts the Blobs runtime metadata is not injected.
 // Prefer explicit server-side credentials when provided; otherwise use Netlify's automatic context.
 function reviewStore() {
@@ -64,30 +64,39 @@ exports.handler = async event => {
   if(complete&&!state.emailed){
     const approved=state.cards.filter(c=>state.decisions[c.id].decision==='approved').length;
     const rejected=state.cards.length-approved;
-    const base=process.env.URL||'';
-    const details=state.cards.map((c,i)=>`${i+1}. ${c.company} | ${c.artwork||c.id} | ${state.decisions[c.id].decision.toUpperCase()}${state.decisions[c.id].comment?' | Comment: '+state.decisions[c.id].comment:''}`).join('\n');
-    const report=[`Shared view: ${view}`,`Completed: ${new Date().toISOString()}`,`Approved: ${approved}`,`Rejected: ${rejected}`,`Total: ${state.cards.length}`,`View URL: ${base+view}`,'','ARTWORK DECISIONS',details].join('\n');
-    // Netlify Forms requires a form registered from static HTML at deploy time.
-    // Only submit after the server verifies that all artwork has a decision.
-    const origin=process.env.URL;
-    if(!origin || !/^https:\/\/[^/]+$/.test(origin.replace(/\/$/,''))){
-      console.error('Missing/invalid Netlify URL environment variable');emailError=true;
-    }else{
-      try {
-        const body=new URLSearchParams({
-          'form-name':'artwork-review-complete',
-          subject:`Artwork review complete: ${view.split('/').pop()}`,
-          view,completed_at:new Date().toISOString(),
-          approved:String(approved),rejected:String(rejected),total:String(state.cards.length),
-          view_url:base+view,report
-        });
-        const result=await fetch(origin.replace(/\/$/,'')+'/review-notification-form.html',{
-          method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-          body:body.toString(),redirect:'manual',signal:AbortSignal.timeout(12000)
-        });
-        if(!result.ok && !(result.status>=300&&result.status<400))throw new Error('Netlify Forms HTTP '+result.status);
-        state.emailed=true;state.emailedAt=new Date().toISOString();await store.setJSON(key,state);
-      }catch(e){console.error('Netlify Forms notification submission failed',e);emailError=true;}
+    const now=new Date().toISOString();
+    const base=(process.env.URL||'').replace(/\/$/,'');
+    const rows=state.cards.map((c,i)=>({number:i+1,company:c.company,artwork:c.artwork||c.id,status:state.decisions[c.id].decision.toUpperCase(),comment:state.decisions[c.id].comment||'',reviewed_at:state.decisions[c.id].updatedAt||''}));
+    const details=rows.map(r=>`${r.number}. ${r.company} | ${r.artwork} | ${r.status}${r.comment?' | Comment: '+r.comment:''}`).join('\n');
+    const report=[`Shared view: ${view}`,`Completed: ${now}`,`Approved: ${approved}`,`Rejected: ${rejected}`,`Total: ${state.cards.length}`,`View URL: ${base+view}`,'','ARTWORK DECISIONS',details].join('\n');
+    // Submit a single consolidated report only after server-side completion.
+    // Netlify's static form declaration is in review-notification-form.html.
+    try {
+      if(!/^https:\/\/[^/]+$/.test(base)) throw new Error('Netlify URL environment variable is missing or invalid');
+      const fields={
+        'form-name':'artwork-review-complete',
+        subject:`Artwork review complete: ${view.split('/').pop()}`,
+        view,completed_at:now,
+        approved:String(approved),rejected:String(rejected),total:String(state.cards.length),
+        view_url:base+view,
+        summary:`${approved} approved, ${rejected} rejected out of ${state.cards.length} artworks`,
+        report,artwork_decisions:JSON.stringify(rows)
+      };
+      // Netlify's documented AJAX form pattern posts to the site root.
+      const result=await fetch(base+'/',{
+        method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams(fields).toString(),redirect:'manual',signal:AbortSignal.timeout(12000)
+      });
+      // Accept only typical success responses. An HTML response alone cannot
+      // prove that Netlify registered the form or delivered an email.
+      if(![200,201,202,301,302,303].includes(result.status))throw new Error('Netlify Forms HTTP '+result.status);
+      state.emailed=true;state.emailedAt=now;state.notificationStatus='submitted';delete state.notificationError;
+      await store.setJSON(key,state);
+      console.log('Artwork review report submitted to Netlify Forms',{view,total:rows.length,approved,rejected,httpStatus:result.status});
+    }catch(e){
+      console.error('Netlify Forms notification submission failed',{view,error:String(e?.message||e)});
+      emailError=true;state.notificationStatus='failed';state.notificationError=clean(e?.message||e,250);
+      await store.setJSON(key,state);
     }
   }
   return json(200,{...responseState(state),complete,emailError});
