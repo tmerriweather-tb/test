@@ -193,7 +193,7 @@ html.dashboard-locked #dashboard-password-gate{display:flex}
 <script>
 /* CLIENT-SIDE ACCESS SCREEN ONLY. It does not protect source code or data. */
 /* Change the value below BEFORE publishing. Do not use a valuable/reused password. */
-const DASHBOARD_VIEW_PASSWORD = 'REPLACE_WITH_YOUR_PASSWORD';
+const DASHBOARD_VIEW_PASSWORD = 'TEST03';
 const DASHBOARD_SESSION_KEY = 'approvals-dashboard-unlocked';
 if (!location.pathname.startsWith('/shared/') && sessionStorage.getItem(DASHBOARD_SESSION_KEY) !== 'yes') {
   document.documentElement.classList.add('dashboard-locked');
