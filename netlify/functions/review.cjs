@@ -68,19 +68,20 @@ exports.handler = async event => {
     const base=(process.env.URL||'').replace(/\/$/,'');
     const rows=state.cards.map((c,i)=>({number:i+1,company:c.company,artwork:c.artwork||c.id,status:state.decisions[c.id].decision.toUpperCase(),comment:state.decisions[c.id].comment||'',reviewed_at:state.decisions[c.id].updatedAt||''}));
     const details=rows.map(r=>`${r.number}. ${r.company} | ${r.artwork} | ${r.status}${r.comment?' | Comment: '+r.comment:''}`).join('\n');
-    const report=[`Shared view: ${view}`,`Completed: ${now}`,`Approved: ${approved}`,`Rejected: ${rejected}`,`Total: ${state.cards.length}`,`View URL: ${base+view}`,'','ARTWORK DECISIONS',details].join('\n');
+    const venue=view.split('/').pop().replace(/\.html$/i,'').replace(/_/g,' ');
+    const report=[`Artwork review completed for ${venue}`,`Review completed: ${now}`,`Total artworks: ${state.cards.length}`,`Approved: ${approved}`,`Rejected: ${rejected}`,'','Individual artwork decisions:',details].join('\n');
     // Submit a single consolidated report only after server-side completion.
     // Netlify's static form declaration is in review-notification-form.html.
     try {
       if(!/^https:\/\/[^/]+$/.test(base)) throw new Error('Netlify URL environment variable is missing or invalid');
       const fields={
         'form-name':'artwork-review-complete',
-        subject:`Artwork review complete: ${view.split('/').pop()}`,
-        view,completed_at:now,
+        subject:`Completed artwork review - ${venue}`,
+        venue,review_status:'Complete',view,completed_at:now,
         approved:String(approved),rejected:String(rejected),total:String(state.cards.length),
         view_url:base+view,
-        summary:`${approved} approved, ${rejected} rejected out of ${state.cards.length} artworks`,
-        report,artwork_decisions:JSON.stringify(rows)
+        summary:`Completed review for ${venue}: ${approved} approved and ${rejected} rejected, ${state.cards.length} artworks total.`,
+        report,artwork_decisions:details
       };
       // Netlify's documented AJAX form pattern posts to the site root.
       const result=await fetch(base+'/',{

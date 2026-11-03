@@ -48,3 +48,10 @@ The function now posts the completed report to `/` using Netlify's AJAX Forms pa
 After deployment, use a **new, uncompleted shared view** for the end-to-end test. A view previously marked `emailed: true` will not send another report, even if you replace the code. If `emailed: false` and all decisions are complete, changing and resaving one card will retry the form submission. `emailed: true` means the form POST was accepted, not that an email reached the inbox. Check the Netlify Forms submission detail, spam submissions, and notification settings.
 
 If a new report still shows only one artwork, verify the review progress count: the function freezes the initial artwork list (`state.cards`) on the first saved decision. Changes to the list after that point require an intentional new review round; do not silently overwrite existing approval records.
+
+
+## Spam-filtering improvements
+
+This update keeps Netlify Forms and its original form name. The notification payload now includes a readable venue, a completion status, a concise summary, and human-readable artwork decisions rather than a JSON dump. The full report remains available in the `report` field. The view URL is provided once as its own field. Existing Blobs review state and all shared pages are unchanged.
+
+**Important:** Netlify/Akismet controls spam classification. These content changes may reduce false positives but cannot guarantee verified delivery or override the spam filter. Mark legitimate reports as verified in Netlify Forms, and contact Netlify support with example submission IDs if new reports continue to be flagged. Existing reviews marked `emailed: true` will not automatically resubmit after deployment; test using an uncompleted shared view.
