@@ -566,7 +566,7 @@ function reviewCardKey(d){
   return (h>>>0).toString(36);
 }
 function reviewCards(){return groupApprovalsByCompany(DATA).map(d=>({id:reviewCardKey(d),company:String(d['Company Name']||'Untitled'),artwork:String(d.FileUrl||'')}));}
-function reviewViewId(){return location.pathname.startsWith('/shared/')?location.pathname:'/shared/'+location.pathname.split('/').pop();}
+function reviewViewId(){const path=decodeURIComponent(location.pathname);return path.startsWith('/shared/')?path:'/shared/'+path.split('/').pop();}
 function reviewActionHtml(d){
  if(!IS_SHARED_VIEW)return '';
  const id=reviewCardKey(d),state=REVIEW_DECISIONS[id]||{},decision=state.decision||'';

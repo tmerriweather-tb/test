@@ -4,7 +4,26 @@ const EMAIL_TO = 'tmerriweather@terraboost.biz';
 const json = (statusCode, obj) => ({ statusCode, headers: {'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}, body:JSON.stringify(obj) });
 const clean = (v,max=200) => String(v??'').slice(0,max);
 const esc = s => clean(s,1200).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const validView = v => typeof v==='string' && v.startsWith('/shared/') && v.endsWith('.html') && v.length<240 && !v.includes('..') && !/[?#\\\x00-\x1f]/.test(v);
+// Normalize URL-encoded and absolute shared-page URLs to a canonical /shared/*.html path.
+// Only actual shared HTML pages are accepted; traversal and non-HTML paths are rejected.
+function normalizeView(value) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 2048) return null;
+  let path = value.trim();
+  try {
+    if (/^https?:\/\//i.test(path)) path = new URL(path).pathname;
+    else path = path.split(/[?#]/, 1)[0];
+    // Decode encoded filenames (including spaces and ampersands) once.
+    path = decodeURIComponent(path);
+  } catch (_) { return null; }
+  if (!path.startsWith('/')) path = '/' + path;
+  if (!path.startsWith('/shared/')) return null;
+  if (path.length >= 240 || !path.endsWith('.html') || /[\\\x00-\x1f]/.test(path)) return null;
+  const segments = path.split('/');
+  if (segments.some(segment => segment === '.' || segment === '..')) return null;
+  // Shared pages are individual HTML files directly within /shared/.
+  if (segments.length !== 3 || !segments[2] || segments[2].includes('/')) return null;
+  return path;
+}
 const viewKey = v => crypto.createHash('sha256').update(v).digest('hex');
 const responseState = state => ({decisions:state.decisions||{},emailed:!!state.emailed});
 // In some Netlify deploy contexts the Blobs runtime metadata is not injected.
@@ -21,8 +40,8 @@ exports.handler = async event => {
   const method=event.httpMethod;
   if(method!=='GET' && method!=='POST')return json(405,{error:'Method not allowed'});
   const input=method==='POST'?JSON.parse(event.body||'{}'):event.queryStringParameters||{};
-  const view=input.view;
-  if(!validView(view))return json(400,{error:'Invalid shared page path'});
+  const view=normalizeView(input.view);
+  if(!view)return json(400,{error:'Invalid shared page path',code:'INVALID_VIEW',received:typeof input.view==='string'?input.view.slice(0,300):null});
   const store=reviewStore();
   const key=viewKey(view);
   let state=await store.get(key,{type:'json'})||{view,decisions:{},emailed:false};

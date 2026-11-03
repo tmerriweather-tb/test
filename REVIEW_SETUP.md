@@ -32,3 +32,10 @@ The response property `emailed` means the form submission request was accepted, 
 * The `index.html` password gate is client-side and not a secure access boundary.
 
 All 49 shared pages and their grouped navigation, landscape PDF, HTML download, and artwork decision controls are retained. New exports continue to use the existing review endpoint.
+
+
+## Shared page path fix
+
+The review function now normalizes percent-encoded filenames and full URLs to a consistent `/shared/filename.html` identifier. This resolves HTTP 400 `Invalid shared page path` for valid shared pages. If a 400 persists, inspect the response `received` field (it contains the supplied path, not credentials) and compare it with the actual deployed URL.
+
+After deployment, verify GET at `/.netlify/functions/review?view=%2Fshared%2FHEB_Oct2026.html`, then test an Approved decision from the shared page. This does not guarantee email notification delivery until the form is configured and tested.

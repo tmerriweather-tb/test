@@ -193,7 +193,7 @@ html.dashboard-locked #dashboard-password-gate{display:flex}
 <script>
 /* CLIENT-SIDE ACCESS SCREEN ONLY. It does not protect source code or data. */
 /* Change the value below BEFORE publishing. Do not use a valuable/reused password. */
-const DASHBOARD_VIEW_PASSWORD = 'TEST';
+const DASHBOARD_VIEW_PASSWORD = 'REPLACE_WITH_YOUR_PASSWORD';
 const DASHBOARD_SESSION_KEY = 'approvals-dashboard-unlocked';
 if (!location.pathname.startsWith('/shared/') && sessionStorage.getItem(DASHBOARD_SESSION_KEY) !== 'yes') {
   document.documentElement.classList.add('dashboard-locked');
@@ -562,7 +562,7 @@ function reviewCardKey(d){
   return (h>>>0).toString(36);
 }
 function reviewCards(){return groupApprovalsByCompany(DATA).map(d=>({id:reviewCardKey(d),company:String(d['Company Name']||'Untitled'),artwork:String(d.FileUrl||'')}));}
-function reviewViewId(){return location.pathname.startsWith('/shared/')?location.pathname:'/shared/'+location.pathname.split('/').pop();}
+function reviewViewId(){const path=decodeURIComponent(location.pathname);return path.startsWith('/shared/')?path:'/shared/'+path.split('/').pop();}
 function reviewActionHtml(d){
  if(!IS_SHARED_VIEW)return '';
  const id=reviewCardKey(d),state=REVIEW_DECISIONS[id]||{},decision=state.decision||'';
